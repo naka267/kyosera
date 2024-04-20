@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>京セラ再現機</title>
+<style>
+body {display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f0f0;}
+button {padding: 10px 20px; font-size: 20px; background-color: #0074D9; color: white; border: none; cursor: pointer; margin-right: 10px;}
+button:disabled {background-color: #AAAAAA; cursor: not-allowed;}
+input {font-size: 20px; padding: 5px;}
+</style>
+</head>
+<body>
+  <p><button id="start">Start</button><button id="stop" disabled>Stop</button></p>
+  <input id="delay" type="number" min="0" step="0.1" value="3"> 秒
+<script>
+let sB = document.querySelector('#start'), sT = document.querySelector('#stop'), dI = document.querySelector('#delay'), aC = new (window.AudioContext || window.webkitAudioContext)(), s, p, b = [], oS = false;
+sB.addEventListener('click', function() {
+    sB.disabled = true; sT.disabled = false;
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    .then(function(stream) {
+        s = aC.createMediaStreamSource(stream); p = aC.createScriptProcessor(1024, 1, 1);
+        s.connect(p); p.connect(aC.destination);
+        p.onaudioprocess = function(e) {
+            b.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+            if (!oS && b.length > aC.sampleRate * dI.value / 1024) { oS = true; playBuffer(); }
+        };
+    }).catch(function(err) { console.log('The following error occurred: ' + err); });
+});
+sT.addEventListener('click', function() { sB.disabled = false; sT.disabled = true; if (s) { s.disconnect(); s = null; } if (p) { p.disconnect(); p = null; } b = []; oS = false; });
+function playBuffer() {
+    if (b.length === 0) { setTimeout(playBuffer, 100); return; }
+    let aB = aC.createBuffer(1, 1024, aC.sampleRate); aB.getChannelData(0).set(b.shift());
+    let aS = aC.createBufferSource(); aS.buffer = aB; aS.connect(aC.destination); aS.start();
+    aS.onended = function() { aS.disconnect(); aS = null; playBuffer(); };
+}
+</script>
+</body>
+</html>
